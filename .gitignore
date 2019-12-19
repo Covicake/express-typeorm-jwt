@@ -1,0 +1,8 @@
+/dist/
+/node_modules/
+package-lock.json
+ormlogs.log
+node_modules/
+dist/
+config.ts
+.env

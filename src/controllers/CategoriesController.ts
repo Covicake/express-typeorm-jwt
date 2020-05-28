@@ -1,91 +1,60 @@
-import * as express from 'express';
-import { Category } from '../models/Category/Category';
-import App from '../App';
+import { NextFunction, Request, Response, Router } from 'express'
+import App from '../App'
+import { CategoryRepository } from '../repositories/category'
+import { ItemRepository } from '../repositories/item'
 
-
-
-class CategoriesController {
-    public path = '/category';
-    public router: express.Router = express.Router();
-    public app: App;
+export class CategoriesController {
+    public path = '/items'
+    public router = Router()
+    public app: App
+    public categoryRepository: CategoryRepository
+    public itemRepository: ItemRepository
 
     constructor() {
-        
+        this.categoryRepository = new CategoryRepository()
+        this.itemRepository = new ItemRepository()
     }
 
     public initializeRoutes() {
         // Controller middleware
-        this.router.use(this.validateInput);
+        this.router.use(this.app.authorize, (req: Request, res: Response, next: NextFunction) => next())
 
         // Controller endpoints
-        this.router.get(this.path, this.app.authorize, this.getAllCategories);
-        this.router.get(this.path + '/:id', this.app.authorize, this.getCategory);
-
-        this.router.post(this.path, this.app.authorize, this.createCategory);
-
-        this.router.put(this.path + '/:id', this.app.authorize, this.updateCategory);
-
-        this.router.delete(this.path + '/:id', this.app.authorize, this.deleteCategory);
+        this.router.get(this.path, this.getAllCategories)
+        this.router.get(`${this.path}/:categoryId`, this.getCategory)
+        this.router.get(`${this.path}/:categoryId/items`, this.getCategoryItems)
+        this.router.post(this.path, this.createCategory)
+        this.router.patch(`${this.path}/:categoryId`, this.updateCategory)
+        this.router.delete(`${this.path}/:categoryId`, this.deleteCategory)
     }
 
-    public validateInput(req: express.Request, res: express.Response, next: express.NextFunction) {
-        const params = {id: req.url.split('/')[2]};
-        switch (req.method) {
-            case 'GET':
-                break;
-            case 'DELETE':
-                if (!params.id) { return res.status(400).send({ message: 'Id is required'}); }
-                break;
-            case 'POST':
-                if (Object.keys(req.body).length === 0) { return res.status(400).send({ message: "Request body can't be empty"}); }
-                break;
-            case 'PUT':
-                if (!params.id) { return res.status(400).send({ message: 'Id is required'}); }
-                if (Object.keys(req.body).length === 0) { return res.status(400).send({ message: "Request body can't be empty"}); }
-                break;
-        }
-        next();
+    getAllCategories = async (req: Request, res: Response) => {
+        const categories = await this.categoryRepository.findAll()
+        return res.send(categories)
     }
 
-    public async getAllCategories (req: express.Request, res: express.Response) {
-        let categories = await Category.find({relations: ['items']});
-        const simplifiedCategories = categories.map((category) => {
-            let simpleCategory = {
-                id: category.id,
-                name: category.name,
-                image_url: category.image_url,
-                items: category.items.length,
-            }
-            return simpleCategory;
-        })
-        return res.send(simplifiedCategories);
+    getCategory = async (req: Request, res: Response) => {
+        const category = await this.categoryRepository.find(Number(req.params.categoryId))
+        return res.send(category)
     }
 
-    public async getCategory (req: express.Request, res: express.Response) {
-        const category =  await Category.findOne(req.params.id, {relations: ['items']});
-        return res.send(category);
+    getCategoryItems = async (req: Request, res: Response) => {
+        const categories = await this.itemRepository.findCategoryItems(Number(req.params.categoryId))
+        return res.send(categories)
     }
 
-    public async createCategory (req: express.Request, res: express.Response) {
-        const category = await Category.create(req.body);
-        category.save();
-        return res.send(category);
+    createCategory = async (req: Request, res: Response) => {
+        const category = this.categoryRepository.create(req.body)
+        return res.send(category)
     }
 
-    public async updateCategory(req: express.Request, res: express.Response) {
-        const category = await Category.findOne(req.params.id);
-        if (category !== undefined) {
-            await Category.update(req.params.id, req.body);
-            return res.status(200).send({ message: 'Category updated correctly'});
-        }
-
-        return res.status(404).send({ message: 'Category not found'});
+    updateCategory = async (req: Request, res: Response) => {
+        const category = this.categoryRepository.update(Number(req.params.categoryId), req.body)
+        return res.send(category)
     }
 
-    public async deleteCategory(req: express.Request, res: express.Response) {
-        Category.delete(req.params.id);
-        return res.status(200).send({ message: 'Category deleted successfully'});
+    deleteCategory = async (req: Request, res: Response) => {
+        const deleteResult = this.categoryRepository.delete(Number(req.params.categoryId))
+        return res.send(deleteResult)
     }
 }
-
-export default CategoriesController;

@@ -1,14 +1,13 @@
-import App from './App';
-import key from "./config";
-import CategoriesController from "./controllers/CategoriesController";
-import ItemsController from "./controllers/ItemsController";
-import UserController from "./controllers/UserController";
+import App from './App'
+import { config } from './config'
+import { AuthController, CategoriesController, ItemsController, UsersController } from './controllers'
 
-const controllers = [new CategoriesController(), new ItemsController(), new UserController()];
+const controllers = [UsersController, ItemsController, CategoriesController, AuthController]
 
-const PORT = Number(process.env.PORT) || 3000;
-const app = new App(controllers, PORT);
-app.app.set('key', key.key);
-app.listen();
+const PORT = Number(process.env.PORT) || 3000
+const app = new App(controllers, PORT)
 
-export default app;
+app.app.set('key', config.key)
+app.listen()
+
+export default app

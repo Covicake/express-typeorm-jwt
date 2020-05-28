@@ -1,87 +1,75 @@
-import * as express from 'express';
-import { Item } from '../models/Item/Item';
-import App from '../App';
+import { NextFunction, Request, Response, Router } from 'express'
+import App from '../App'
+import { CategoryRepository } from '../repositories/category'
+import { ItemRepository } from '../repositories/item'
+import { UserRepository } from '../repositories/user'
 
-
-
-class ItemsController {
-    public path = '/item';
-    public router: express.Router = express.Router();
-    public app: App;
+export class ItemsController {
+    public path = '/items'
+    public router = Router()
+    public app: App
+    public itemRepository: ItemRepository
+    public categoryRepository: CategoryRepository
+    public userRepository: UserRepository
 
     constructor() {
+        this.itemRepository = new ItemRepository()
+        this.categoryRepository = new CategoryRepository()
+        this.userRepository = new UserRepository()
     }
 
     public initializeRoutes() {
         // Controller middleware
-        this.router.use(this.validateInput);
+        this.router.use(this.app.authorize, (req: Request, res: Response, next: NextFunction) => next())
 
         // Controller endpoints
-        this.router.get(this.path, this.app.authorize, this.getAllItems);
-        this.router.get(this.path + '/latest', this.app.authorize, this.getLatestItems)
-        this.router.get(this.path + '/:id', this.app.authorize, this.getItem);
-
-        this.router.post(this.path, this.app.authorize, this.createItem);
-
-        this.router.put(this.path + '/:id', this.app.authorize, this.updateItem);
-
-        this.router.delete(this.path + '/:id', this.app.authorize, this.deleteItem);
+        this.router.get(this.path, this.getAllItems)
+        this.router.get(`${this.path}/:itemId`, this.getItem)
+        this.router.get(`${this.path}/user/:userId`, this.getUserItems)
+        this.router.post(this.path, this.createItem)
+        this.router.patch(`${this.path}/:itemId`, this.updateItem)
+        this.router.delete(`${this.path}/:itemId`, this.deleteItem)
     }
 
-    public validateInput(req: express.Request, res: express.Response, next: express.NextFunction) {
-        const params = {id: req.url.split('/')[2]};
-        switch (req.method) {
-            case 'GET':
-                break;
-            case 'DELETE':
-                if (!params.id) { return res.status(400).send({ message: 'Id is required'}); }
-                break;
-            case 'POST':
-                if (Object.keys(req.body).length === 0) { return res.status(400).send({ message: "Request body can't be empty"}); }
-                break;
-            case 'PUT':
-                if (!params.id) { return res.status(400).send({ message: 'Id is required'}); }
-                if (Object.keys(req.body).length === 0) { return res.status(400).send({ message: "Request body can't be empty"}); }
-                break;
-        }
-        next();
+    getAllItems = async (req: Request, res: Response) => {
+        const items = await this.itemRepository.findAll()
+        return res.send(items)
     }
 
-    public async getAllItems (req: express.Request, res: express.Response) {
-        const items = await Item.find();
-        return res.send(items);
+    getItem = async (req: Request, res: Response) => {
+        const item = await this.itemRepository.find(Number(req.params.itemId))
+        return res.send(item)
     }
 
-    public async getLatestItems (req: express.Request, res: express.Response) {
-        const items = await Item.find({take: 9});
-        return res.send(items);
+    getUserItems = async (req: Request, res: Response) => {
+        const items = await this.itemRepository.findUserItems(Number(req.params.userId))
+        return res.send(items)
     }
 
-    public async getItem (req: express.Request, res: express.Response) {
-        const item =  await Item.findOne(req.params.id);
-        return res.send(item);
-    }
-
-    public async createItem (req: express.Request, res: express.Response) {
-        const item = Item.create(req.body);
-        item.save();
-        return res.send(item);
-    }
-
-    public async updateItem(req: express.Request, res: express.Response) {
-        const item = await Item.findOne(req.params.id);
-        if (item !== undefined) {
-            await Item.update(req.params.id, req.body);
-            return res.status(200).send({ message: 'Item updated correctly'});
+    createItem = async (req: Request, res: Response) => {
+        if (!req.body.categoryId) {
+            return res.status(400).send('Missing categoryId field')
         }
 
-        return res.status(404).send({ message: 'Item not found'});
+        const user = await this.userRepository.find(req.app.get('userId'))
+        const category = await this.categoryRepository.find(req.body.categoryId)
+        if (!category) {
+            return res.status(404).send('Category not found')
+        }
+
+        const item = this.itemRepository.create({ ...req.body, user, category })
+        return res.send(item)
     }
 
-    public async deleteItem(req: express.Request, res: express.Response) {
-        Item.delete(req.params.id);
-        return res.status(200).send({ message: 'Item deleted successfully'});
+    updateItem = async (req: Request, res: Response) => {
+        const item = this.itemRepository.update(Number(req.params.itemId), req.body)
+
+        return res.send(item)
+    }
+
+    deleteItem = async (req: Request, res: Response) => {
+        const deleteResult = this.itemRepository.delete(Number(req.params.itemId))
+
+        return res.send(deleteResult)
     }
 }
-
-export default ItemsController;

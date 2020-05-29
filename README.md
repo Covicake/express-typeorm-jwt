@@ -21,3 +21,5 @@ Basic implementation for a express.js server using TypeScript, TypeORM and JWT a
   * controllers setup
     * with their own set of local middlewares
   * typeorm connection
+
+This is an example implementation for these features, should work as a template. The example is for a simple wishlist application with categories to hold the items, which also belong to the user who 'wished' them.
